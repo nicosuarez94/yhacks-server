@@ -1,6 +1,14 @@
 var http = require('http'),
     express = require('express'),
-    path = require('path');
+    path = require('path'),
+    braintree = require('braintree');
+
+var gateway = braintree.connect({
+  environment: braintree.Environment.Sandbox,
+  merchantId: "2czxrzx8q7s5sp22",
+  publicKey: "52kd7hx3pd9cbh7x",
+  privateKey: "e617a7c608395a1ad7f1e75a7efe2c16"
+});
 
 var mongoose = require('mongoose');
 
@@ -179,6 +187,47 @@ app.get('/userGoals', function (req, res) {
         console.dir(awns);
     });
 
+});
+
+app.get("/client_token", function (req, res) {
+  console.log('recieved get request!');
+  gateway.clientToken.generate({}, function (err, response) {
+    res.send(response.clientToken);
+  });
+});
+
+app.post("/create_customer", function (req, res) {
+  var nonceFromTheClient = req.body.payment_method_nonce;
+
+  gateway.customer.create({
+    //TODO: should we add name?
+    firstName: "Charity",
+    lastName: "Smith",
+    paymentMethodNonce: nonceFromTheClient
+  }, function (err, result) {
+    if (result.success) {
+      res.send(result.customer.id);
+      // e.g 160923
+    }
+    //result.customer.paymentMethods[0].token;
+    // e.g f28wm
+  });
+});
+
+app.post("/make_sale", function (req, res) {
+  var theCustomerId = req.body.customer_payment_id;
+  
+  gateway.transaction.sale({
+    customerId: theCustomerId,
+    merchantId: merchantId,
+    amount: "1.5"
+  }, function (err, result) {
+    if (err) {
+	console.log("didn't work :/" + err);
+    } else {
+        console.log("success" + result);
+    }
+  });
 });
 
 app.get('/', function (req, res) {
